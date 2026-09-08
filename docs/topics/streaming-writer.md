@@ -92,7 +92,8 @@ Because the workbook contains a formula, `close()` marks the workbook for
 full calculation on load, so Excel (or another spreadsheet application)
 computes `=SUM(C2:C2)` when it opens the file. The written cell itself has
 no cached value. If no sheet in the workbook contains a formula, `close()`
-does not force a recalculation on load.
+does not force a recalculation on load. The separate `forceFullCalc` option
+remains disabled, matching the standard Xlsx writer default.
 
 Any `DateTimeInterface` value that has no explicit style gets a default
 date number format automatically. Dates use the output workbook's 1900

@@ -216,7 +216,7 @@ class StreamingWriterTest extends TestCase
 
         self::assertSame('1', $formulaCalcPr['fullCalcOnLoad']);
         self::assertSame('0', $formulaCalcPr['calcCompleted']);
-        self::assertSame('1', $formulaCalcPr['forceFullCalc']);
+        self::assertSame('0', $formulaCalcPr['forceFullCalc']);
     }
 
     /** @return array<string, string> */

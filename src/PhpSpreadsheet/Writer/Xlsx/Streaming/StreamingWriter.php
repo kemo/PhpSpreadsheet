@@ -127,9 +127,9 @@ class StreamingWriter
             $zip->addFile('xl/theme/theme1.xml', $partWriter->getWriterPartTheme()->writeTheme($this->shell));
             $zip->addFile('xl/sharedStrings.xml', $partWriter->getWriterPartStringTable()->writeStringTable([]));
             $zip->addFile('xl/styles.xml', $partWriter->getWriterPartStyle()->writeStyles($this->shell));
-            // when a formula was streamed, $forceFullCalc makes writeCalcPr() emit
-            // fullCalcOnLoad="1" forceFullCalc="1" so the opening application computes it
-            $zip->addFile('xl/workbook.xml', $partWriter->getWriterPartWorkbook()->writeWorkbook($this->shell, !$this->hasFormulas, $this->hasFormulas));
+            // Recalculate uncached formulas on load without enabling forceFullCalc,
+            // which also changes calculation behavior in other open Excel workbooks.
+            $zip->addFile('xl/workbook.xml', $partWriter->getWriterPartWorkbook()->writeWorkbook($this->shell, !$this->hasFormulas, XlsxWriter::DEFAULT_FORCE_FULL_CALC));
             foreach ($this->finishedSheets as $index => $finishedSheet) {
                 rewind($finishedSheet['stream']);
                 $zip->addFileFromStream('xl/worksheets/sheet' . ($index + 1) . '.xml', $finishedSheet['stream']);
