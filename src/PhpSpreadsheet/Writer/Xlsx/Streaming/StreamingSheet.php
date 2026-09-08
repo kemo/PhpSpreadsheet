@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming;
 
 use DateTimeInterface;
+use PhpOffice\PhpSpreadsheet\Cell\AddressRange;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx\Namespaces;
@@ -136,6 +137,12 @@ class StreamingSheet
     public function appendRow(array $cells, ?int $styleId = null): void
     {
         $this->assertUsable();
+        if ($this->rowNumber >= AddressRange::MAX_ROW) {
+            throw new WriterException('Cannot append more than ' . AddressRange::MAX_ROW . ' rows to an Xlsx sheet.');
+        }
+        if (count($cells) > AddressRange::MAX_COLUMN_INT) {
+            throw new WriterException('Cannot append more than ' . AddressRange::MAX_COLUMN_INT . ' columns to an Xlsx row.');
+        }
         if ($styleId !== null) {
             $this->assertStyleId($styleId);
         }
@@ -292,14 +299,15 @@ class StreamingSheet
     {
         $this->assertBeforeFirstRow('setColumnWidths');
         foreach ($widths as $columnNumber => $width) {
-            if ($columnNumber < 1) {
-                throw new WriterException("Column number $columnNumber is invalid; column numbers are 1-based.");
+            if ($columnNumber < 1 || $columnNumber > AddressRange::MAX_COLUMN_INT) {
+                throw new WriterException("Column number $columnNumber is invalid; column numbers are 1-based and cannot exceed " . AddressRange::MAX_COLUMN_INT . '.');
             }
-            if ($width <= 0) {
-                throw new WriterException("Column width $width is invalid; width must be positive.");
+            if (!is_finite($width) || $width <= 0 || $width > 255) {
+                throw new WriterException("Column width $width is invalid; width must be positive, finite and no greater than 255.");
             }
-            $this->columnWidths[$columnNumber] = $width;
         }
+        // Validate the whole request before replacing any existing widths.
+        $this->columnWidths = array_replace($this->columnWidths, $widths);
     }
 
     public function freezePane(string $cell): void

@@ -35,6 +35,8 @@ $writer->close();
 ```
 
 Rows are plain arrays of values, written left to right starting at column A.
+A sheet may contain at most 1,048,576 rows and each row at most 16,384
+columns. Exceeding either limit throws before changing the sheet.
 A `null` value leaves that cell empty. Once `close()` has run, the writer
 and every sheet it produced are no longer usable.
 
@@ -129,7 +131,8 @@ with the number of sheets, not with the number of rows in any one sheet.
   `$styleId`, if given, applies to every cell in the row that does not
   carry its own style through `StreamedCell`.
 - `setColumnWidths(array $widths): void` — `$widths` is a 1-based column
-  number mapped to a width, for example `[1 => 30.0, 3 => 12.0]`. Must be
+  number (1 through 16,384) mapped to a finite width greater than zero and
+  at most 255, for example `[1 => 30.0, 3 => 12.0]`. Must be
   called before the first `appendRow()`.
 - `freezePane(string $cell): void` — freezes rows and columns above and to
   the left of `$cell`, for example `'A2'` to freeze the header row. Must be
