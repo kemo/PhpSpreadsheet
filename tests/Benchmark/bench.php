@@ -17,48 +17,10 @@ declare(strict_types=1);
  * directory for the full recipe and recorded results.
  */
 
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming\StreamingWriter;
+use Composer\InstalledVersions;
+use PhpOffice\PhpSpreadsheetBenchmarks\StreamingWriterBenchmark;
 
 require __DIR__ . '/../../vendor/autoload.php';
-
-/** @return array<int, mixed> */
-function benchBuildRow(int $row): array
-{
-    return [
-        'Name ' . $row,
-        $row,
-        $row * 1.5,
-        $row % 2 === 0,
-        new DateTimeImmutable('2026-01-01 00:00:00'),
-        'Description for row ' . $row,
-        $row * 3.25,
-        $row % 3 === 0,
-    ];
-}
-
-function benchRunStandard(int $rows, string $file): void
-{
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-    for ($row = 1; $row <= $rows; ++$row) {
-        $sheet->fromArray(benchBuildRow($row), null, 'A' . $row);
-    }
-    $writer = new Xlsx($spreadsheet);
-    $writer->save($file);
-    $spreadsheet->disconnectWorksheets();
-}
-
-function benchRunStreaming(int $rows, string $file): void
-{
-    $writer = new StreamingWriter($file);
-    $sheet = $writer->startSheet('Data');
-    for ($row = 1; $row <= $rows; ++$row) {
-        $sheet->appendRow(benchBuildRow($row));
-    }
-    $writer->close();
-}
 
 /** @param array<int, string> $argv */
 function benchMain(array $argv): int
@@ -70,6 +32,11 @@ function benchMain(array $argv): int
         return 1;
     }
     $rows = isset($argv[2]) ? (int) $argv[2] : 200000;
+    if ($rows < 1) {
+        fwrite(STDERR, "Rows must be positive.\n");
+
+        return 1;
+    }
 
     $file = tempnam(sys_get_temp_dir(), 'phpspreadsheet_bench_');
     if ($file === false) {
@@ -78,20 +45,24 @@ function benchMain(array $argv): int
         return 1;
     }
 
-    $start = hrtime(true);
-    if ($engine === 'standard') {
-        benchRunStandard($rows, $file);
-    } else {
-        benchRunStreaming($rows, $file);
+    try {
+        $start = hrtime(true);
+        if ($engine === 'standard') {
+            StreamingWriterBenchmark::writeStandard($rows, $file);
+        } else {
+            StreamingWriterBenchmark::writeStreaming($rows, $file);
+        }
+        $elapsedNs = hrtime(true) - $start;
+        $peakMemoryBytes = memory_get_peak_usage(true);
+        $fileSizeBytes = filesize($file);
+    } finally {
+        unlink($file);
     }
-    $elapsedNs = hrtime(true) - $start;
-
-    $peakMemoryBytes = memory_get_peak_usage(true);
-    $fileSizeBytes = filesize($file);
-    unlink($file);
 
     $result = [
         'engine' => $engine,
+        'php_version' => PHP_VERSION,
+        'zipstream_version' => InstalledVersions::getPrettyVersion('maennchen/zipstream-php'),
         'rows' => $rows,
         'elapsed_ms' => $elapsedNs / 1_000_000,
         'peak_memory_bytes' => $peakMemoryBytes,

@@ -6,9 +6,14 @@ cells (string, int, float, bool, `DateTimeImmutable`, string, float, bool)
 and prints one JSON line with wall time, peak memory, and output file
 size.
 
-These scripts are not PHPUnit tests. `phpunit.xml.dist` only scans
-`tests/PhpSpreadsheetTests`, so `tests/Benchmark` is never picked up by
-`phpunit` runs.
+The scripts are not PHPUnit test classes. The default PHPUnit suite scans
+`tests/PhpSpreadsheetTests`; a regression test there verifies that both engines
+produce the same values, booleans, numeric dates and date formats on a small
+sample. Both engines use the same sheet name and preserve false values.
+
+The JSON output records the PHP and ZipStream versions alongside measurements.
+The memory regression test invokes the streaming benchmark in separate PHP
+processes, avoiding allocator and cache state shared between measurements.
 
 ## Usage
 
@@ -36,18 +41,7 @@ Take the median `elapsed_ms` and median `peak_memory_bytes` of each set of
 
 ## Recorded results
 
-Environment: PHP 8.5.2 (cli, NTS, Opcache), Darwin 24.5.0 arm64
-(macOS, Apple Silicon), 2026-08-18. 200,000 rows x 8 columns, 3 runs per
-engine in separate `php -d memory_limit=4G` processes, medians reported.
-
-| Engine | Median wall time | Median peak memory | Output file size |
-| --- | --- | --- | --- |
-| Standard (`Spreadsheet` + `Writer\Xlsx`) | 123.35 s | 1113.36 MB | 10,547,334 bytes |
-| Streaming (`StreamingWriter`) | 6.73 s | 46.42 MB | 9,398,884 bytes |
-| **Ratio (standard / streaming)** | **~18.3x slower** | **~24.0x more memory** | ~1.12x larger |
-
-The streaming writer is about 18 times faster and uses about 24 times less
-peak memory for this workload, while producing a slightly smaller file
-(inline strings avoid `sharedStrings.xml` overhead for this
-mostly-unique-string dataset). Peak memory and file size are stable across
-runs; wall time varies by less than 4%.
+The earlier measurements used different output types for dates and omitted false
+values in the standard writer. Rerun the commands above with the corrected
+workload before comparing performance. Results depend on PHP, ZipStream, storage
+and the proportions of unique and repeated strings.
