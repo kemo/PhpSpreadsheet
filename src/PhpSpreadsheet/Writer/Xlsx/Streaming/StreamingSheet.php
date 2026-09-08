@@ -159,7 +159,7 @@ class StreamingSheet
             $column = 0;
             foreach ($cells as $value) {
                 ++$column;
-                if ($value === null) {
+                if ($value === null && ($styleId === null || $styleId === 0)) {
                     continue;
                 }
                 $this->writeCell($column, $value, $styleId);
@@ -198,9 +198,9 @@ class StreamingSheet
                 throw new WriterException("Unsupported StreamedCell data type '$forcedType'; only DataType::TYPE_STRING and DataType::TYPE_STRING2 are supported.");
             }
             $value = $value->value;
-            if ($value === null) {
-                return;
-            }
+        }
+        if ($value === null && ($cellStyleId === null || $cellStyleId === 0)) {
+            return;
         }
 
         $isDate = $value instanceof DateTimeInterface;
@@ -215,6 +215,11 @@ class StreamingSheet
             $xmlWriter->writeAttribute('s', (string) $cellStyleId);
         }
 
+        if ($value === null) {
+            $xmlWriter->endElement(); // styled blank cell
+
+            return;
+        }
         if ($forcedType === DataType::TYPE_STRING || $forcedType === DataType::TYPE_STRING2) {
             $this->writeInlineString(is_scalar($value) ? (string) $value : $this->rejectValue($value));
         } elseif ($isDate) {

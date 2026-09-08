@@ -37,7 +37,8 @@ $writer->close();
 Rows are plain arrays of values, written left to right starting at column A.
 A sheet may contain at most 1,048,576 rows and each row at most 16,384
 columns. Exceeding either limit throws before changing the sheet.
-A `null` value leaves that cell empty. Once `close()` has run, the writer
+A `null` value leaves that cell empty while preserving any row or cell style
+that applies to it. Once `close()` has run, the writer
 and every sheet it produced are no longer usable.
 
 ## Full worked example
