@@ -68,21 +68,36 @@ class StreamingSheet
             $this->writeHeader();
         }
         $this->finished = true;
-        fwrite($this->stream, '</sheetData>');
+        $this->writeAll('</sheetData>');
         if ($this->autoFilter && $this->rowNumber > 0 && $this->maxColumn > 0) {
             $range = 'A1:' . Coordinate::stringFromColumnIndex($this->maxColumn) . $this->rowNumber;
-            fwrite($this->stream, '<autoFilter ref="' . $range . '"/>');
+            $this->writeAll('<autoFilter ref="' . $range . '"/>');
         }
-        fwrite($this->stream, '</worksheet>');
+        $this->writeAll('</worksheet>');
 
         return $this->stream;
+    }
+
+    private function writeAll(string $data): void
+    {
+        $length = strlen($data);
+        $offset = 0;
+        while ($offset < $length) {
+            $written = fwrite($this->stream, substr($data, $offset));
+            if ($written === false || $written === 0) {
+                $this->broken = true;
+
+                throw new WriterException('Could not write all sheet data to the temporary stream.');
+            }
+            $offset += $written;
+        }
     }
 
     private function writeHeader(): void
     {
         $this->headerWritten = true;
-        fwrite($this->stream, '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n");
-        fwrite($this->stream, '<worksheet xmlns="' . Namespaces::MAIN . '" xmlns:r="' . Namespaces::SCHEMA_OFFICE_DOCUMENT . '">');
+        $this->writeAll('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . "\n");
+        $this->writeAll('<worksheet xmlns="' . Namespaces::MAIN . '" xmlns:r="' . Namespaces::SCHEMA_OFFICE_DOCUMENT . '">');
         $paneXml = '';
         if ($this->freezeCell !== null) {
             [$paneColumn, $paneRow] = Coordinate::indexesFromString($this->freezeCell);
@@ -94,7 +109,7 @@ class StreamingSheet
                 . ($ySplit > 0 ? ' ySplit="' . $ySplit . '"' : '')
                 . ' topLeftCell="' . $this->freezeCell . '" activePane="' . $activePane . '" state="frozen"/>';
         }
-        fwrite($this->stream, '<sheetViews><sheetView workbookViewId="0">' . $paneXml . '</sheetView></sheetViews>');
+        $this->writeAll('<sheetViews><sheetView workbookViewId="0">' . $paneXml . '</sheetView></sheetViews>');
         if ($this->columnWidths !== []) {
             $cols = '<cols>';
             ksort($this->columnWidths);
@@ -102,9 +117,9 @@ class StreamingSheet
                 $cols .= '<col min="' . $columnNumber . '" max="' . $columnNumber . '" width="' . $width . '" customWidth="1"/>';
             }
             $cols .= '</cols>';
-            fwrite($this->stream, $cols);
+            $this->writeAll($cols);
         }
-        fwrite($this->stream, '<sheetData>');
+        $this->writeAll('<sheetData>');
     }
 
     private function assertUsable(): void
@@ -149,7 +164,7 @@ class StreamingSheet
                 throw new WriterException('Unexpected non-string result from XMLWriter::flush().');
                 // @codeCoverageIgnoreEnd
             }
-            fwrite($this->stream, $flushed);
+            $this->writeAll($flushed);
         } catch (Throwable $e) {
             $this->broken = true;
             $this->xmlWriter->flush(); // discard the unclosed <row> left behind by the failure
