@@ -32,6 +32,7 @@ class StreamingErrorsTest extends TestCase
     private function tempFile(): string
     {
         $file = File::temporaryFilename();
+        unlink($file);
         $this->tempFiles[] = $file;
 
         return $file;
@@ -200,7 +201,7 @@ class StreamingErrorsTest extends TestCase
     {
         $file = $this->tempFile();
         $writer = new StreamingWriter($file);
-        self::assertFileExists($file);
+        self::assertFileDoesNotExist($file);
         unset($writer);
         self::assertFileDoesNotExist($file);
     }
@@ -209,7 +210,7 @@ class StreamingErrorsTest extends TestCase
     {
         $file = $this->tempFile();
         $writer = new StreamingWriter($file);
-        self::assertFileExists($file);
+        self::assertFileDoesNotExist($file);
 
         try {
             $writer->close();

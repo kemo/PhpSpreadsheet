@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming;
 
-use Exception;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Style\Style;
@@ -19,6 +18,10 @@ class StreamingWriter
     private $fileHandle;
 
     private string $filename;
+
+    private ?string $temporaryFilename = null;
+
+    private ?int $filePermissions = null;
 
     private Spreadsheet $shell;
 
@@ -39,25 +42,61 @@ class StreamingWriter
 
     public function __construct(string $filename)
     {
-        try {
-            $fileHandle = fopen($filename, 'wb');
-        } catch (Exception) {
-            $fileHandle = false;
-        }
-        if ($fileHandle === false) {
-            throw new WriterException("Could not open file $filename for writing.");
-        }
         $this->filename = $filename;
-        $this->fileHandle = $fileHandle;
         $this->shell = new Spreadsheet();
         $this->partWriter = new XlsxWriter($this->shell);
+        $fileHandle = false;
+
+        try {
+            $output = $filename;
+            if (!str_contains($filename, '://')) {
+                $directory = realpath(dirname($filename));
+                if ($directory === false || !is_writable($directory)) {
+                    throw new WriterException("Could not open file $filename for writing.");
+                }
+                if (file_exists($filename) && (!is_file($filename) || !is_writable($filename))) {
+                    throw new WriterException("Could not open file $filename for writing.");
+                }
+                $this->filename = $directory . DIRECTORY_SEPARATOR . basename($filename);
+                $permissions = file_exists($filename) ? fileperms($filename) : (0o666 & ~umask());
+                $this->filePermissions = $permissions === false ? null : ($permissions & 0o777);
+                $temporaryFilename = tempnam($directory, '.phpspreadsheet-');
+                if ($temporaryFilename === false) {
+                    throw new WriterException('Could not create temporary output file.');
+                }
+                $this->temporaryFilename = $temporaryFilename;
+                if (dirname($temporaryFilename) !== $directory) {
+                    throw new WriterException('Temporary output must be in the destination directory.');
+                }
+                $output = $temporaryFilename;
+            }
+            $fileHandle = fopen($output, 'wb');
+            if ($fileHandle === false) {
+                throw new WriterException("Could not open file $filename for writing.");
+            }
+            $this->fileHandle = $fileHandle;
+        } catch (Throwable $e) {
+            if (is_resource($fileHandle)) {
+                fclose($fileHandle);
+            }
+            $this->removeTemporaryFile();
+
+            throw new WriterException("Could not open file $filename for writing: " . $e->getMessage(), 0, $e);
+        }
     }
 
     public function __destruct()
     {
+        $this->abort();
+    }
+
+    /** Discard unfinished output and release its streams. Safe after close(). */
+    public function abort(): void
+    {
         if (!$this->closed) {
+            $this->closed = true;
             $this->closeSheetStreams();
-            $this->closeFileHandleAndUnlink();
+            $this->closeOutput();
         }
     }
 
@@ -104,7 +143,7 @@ class StreamingWriter
         $this->assertNotClosed();
         if ($this->sheetCount === 0) {
             $this->closed = true;
-            $this->closeFileHandleAndUnlink();
+            $this->closeOutput();
 
             throw new WriterException('Cannot close a streaming writer with no sheets; call startSheet() first.');
         }
@@ -135,9 +174,21 @@ class StreamingWriter
                 $zip->addFileFromStream('xl/worksheets/sheet' . ($index + 1) . '.xml', $finishedSheet['stream']);
             }
             $zip->finish();
+            if (!fflush($this->fileHandle) || !fclose($this->fileHandle)) {
+                throw new WriterException('Could not close the output file after writing.');
+            }
+            if ($this->temporaryFilename !== null) {
+                if ($this->filePermissions !== null && !chmod($this->temporaryFilename, $this->filePermissions)) {
+                    throw new WriterException('Could not set output file permissions.');
+                }
+                if (!rename($this->temporaryFilename, $this->filename)) {
+                    throw new WriterException('Could not replace the destination with the completed Xlsx file.');
+                }
+                $this->temporaryFilename = null;
+            }
         } catch (Throwable $e) {
             $this->closeSheetStreams();
-            $this->closeFileHandleAndUnlink();
+            $this->closeOutput();
             if ($e instanceof WriterException) {
                 throw $e;
             }
@@ -146,7 +197,6 @@ class StreamingWriter
         }
 
         $this->closeSheetStreams();
-        fclose($this->fileHandle);
     }
 
     public function isStyleIdRegistered(int $styleId): bool
@@ -193,6 +243,8 @@ class StreamingWriter
 
     private function closeSheetStreams(): void
     {
+        $this->activeSheet?->discard();
+        $this->activeSheet = null;
         foreach ($this->finishedSheets as $finishedSheet) {
             if (is_resource($finishedSheet['stream'])) {
                 fclose($finishedSheet['stream']);
@@ -201,13 +253,20 @@ class StreamingWriter
         $this->finishedSheets = [];
     }
 
-    private function closeFileHandleAndUnlink(): void
+    private function closeOutput(): void
     {
         if (is_resource($this->fileHandle)) {
             fclose($this->fileHandle);
         }
-        if (file_exists($this->filename)) {
-            unlink($this->filename);
+        $this->removeTemporaryFile();
+    }
+
+    private function removeTemporaryFile(): void
+    {
+        if ($this->temporaryFilename !== null) {
+            // Cleanup must not mask the original failure or throw from a destructor.
+            @unlink($this->temporaryFilename);
+            $this->temporaryFilename = null;
         }
     }
 }

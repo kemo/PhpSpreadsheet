@@ -80,6 +80,15 @@ class StreamingSheet
         return $this->stream;
     }
 
+    /** @internal Release an active sheet when the writer is aborted or fails. */
+    public function discard(): void
+    {
+        $this->finished = true;
+        if (is_resource($this->stream)) {
+            fclose($this->stream);
+        }
+    }
+
     private function writeAll(string $data): void
     {
         $length = strlen($data);

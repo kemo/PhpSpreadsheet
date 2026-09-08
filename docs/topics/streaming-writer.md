@@ -115,7 +115,10 @@ with the number of sheets, not with the number of rows in any one sheet.
 
 ### `StreamingWriter`
 
-- `__construct(string $filename)` — opens `$filename` for writing.
+- `__construct(string $filename)` — prepares output. For a local path, writes
+  to a temporary file in the destination directory and replaces the destination
+  only after `close()` succeeds. Stream URLs, such as `php://output`, are
+  written directly and cannot provide atomic replacement.
 - `startSheet(string $name): StreamingSheet` — finishes the current sheet,
   if any, and starts a new one. The name must not be empty, must be at most
   31 characters, and must not contain `* : / \ ? [ ]`; an invalid name
@@ -126,6 +129,8 @@ with the number of sheets, not with the number of rows in any one sheet.
   array format used by `Style::applyFromArray()`, and returns its style id.
 - `close(): void` — finishes the last sheet and writes the Xlsx file. The
   writer must have at least one sheet.
+- `abort(): void` — discards unfinished output and closes all sheet streams.
+  Safe to call repeatedly or after `close()`; completed output is retained.
 
 ### `StreamingSheet` (returned by `startSheet()`)
 
@@ -237,7 +242,22 @@ The streaming writer is append-only and forward-only. It does not support:
   example because of an unsupported value or an unregistered
   `StreamedCell` style id, invalidates the sheet. Every later call on that
   sheet, including `close()`, throws. Discard the writer and start again.
-- If the writer is destroyed without a `close()` call, for example when an
-  exception ends the request, the destructor deletes the partial file. No
-  file exists on disk until `close()` returns; a forgotten `close()` means
-  no output and no error.
+- Use `abort()` in a `finally` block to release temporary storage deterministically
+  after an exception. It is safe after a successful `close()` too:
+
+  ```php
+  $writer = new StreamingWriter('export.xlsx');
+  try {
+      $writer->startSheet('Data')->appendRow(['example']);
+      $writer->close();
+  } finally {
+      $writer->abort();
+  }
+  ```
+
+- The destructor also discards unfinished output. Because the writer and active
+  sheet reference each other, destruction may wait for garbage collection.
+- For local paths, an existing destination remains unchanged until `close()`
+  succeeds. Failure or abandonment removes only the writer's temporary output.
+  A new destination does not exist until `close()` succeeds. Destination directory
+  write permission is required for atomic replacement.
