@@ -1,9 +1,9 @@
 # Streaming Xlsx writer
 
 `PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming\StreamingWriter` writes Xlsx
-files directly to a file handle, one row at a time. It does not build a
-`Spreadsheet` object in memory. Use it for large exports where the standard
-writer would use too much memory.
+files one row at a time, using a small shell `Spreadsheet` for workbook
+metadata without retaining cell objects. Use it for large exports where the
+standard writer would use too much memory.
 
 ## When to use it
 
@@ -12,11 +12,11 @@ report with hundreds of thousands of rows. Peak memory does not depend on
 the number of rows written, provided the number of sheets and distinct
 registered styles stays fixed.
 
-Measurements on this feature: writing 100,000 rows and writing 200,000 rows
-both peak at about 34MB of total memory. Most of that 34MB is a fixed 16MB
-read block used internally by the Zip stream, not row data. The standard
-`Xlsx` writer holds every cell in memory, at roughly 1KB or more per cell,
-so its memory use grows with the row count.
+The memory regression test compares 100,000 and 200,000 rows in separate
+PHP processes, including archive assembly. Peak memory depends on PHP and
+ZipStream versions, row width, sheet count and registered styles. The standard
+`Xlsx` writer retains cell objects, so its memory use grows with the row count.
+See `tests/Benchmark/README.md` in the repository for reproducible measurements.
 
 Do not use the streaming writer when you need to read the file back, edit
 existing cells, or use features it does not support (see below). Use the
@@ -40,7 +40,8 @@ A sheet may contain at most 1,048,576 rows and each row at most 16,384
 columns. Exceeding either limit throws before changing the sheet.
 A `null` value leaves that cell empty while preserving any row or cell style
 that applies to it. Once `close()` has run, the writer
-and every sheet it produced are no longer usable.
+and every sheet it produced stop accepting changes. `abort()` remains safe
+to call for cleanup.
 
 ## Full worked example
 
@@ -108,8 +109,9 @@ cell from a header-row count does not need a special case when that cell
 turns out to be A1.
 
 Each finished sheet keeps its buffered XML in memory (a `php://temp`
-stream) until `close()` runs, up to about 2MB per sheet before it spills
-to a real temporary file on disk. Memory use at `close()` therefore scales
+stream) until `close()` runs, up to 2MiB per sheet before it spills
+to a real temporary file on disk. Temporary disk usage grows with the
+serialized worksheet data. Memory use at `close()` therefore scales
 with the number of sheets, not with the number of rows in any one sheet.
 
 ## API
@@ -236,7 +238,8 @@ The streaming writer is append-only and forward-only. It does not support:
   the `StreamingSheet` object returned by the previous `startSheet()` call
   becomes unusable, and any further method call on it throws a
   `Writer\Exception`.
-- Nothing on the writer or on any sheet is usable after `close()` has run.
+- After `close()` or `abort()`, the writer and its sheets stop accepting changes.
+  Further `abort()` calls are harmless.
 - Arguments are checked before any XML is written where possible: an
   invalid sheet name, an unregistered row-level `$styleId`, an invalid
   freeze pane cell, and invalid column widths all throw without harming
