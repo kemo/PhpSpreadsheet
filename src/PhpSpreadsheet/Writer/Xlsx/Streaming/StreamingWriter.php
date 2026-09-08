@@ -187,8 +187,8 @@ class StreamingWriter
                 throw new WriterException('Could not close the output file after writing.');
             }
             if ($this->temporaryFilename !== null) {
-                if ($this->filePermissions !== null && !chmod($this->temporaryFilename, $this->filePermissions)) {
-                    throw new WriterException('Could not set output file permissions.');
+                if ($this->filePermissions !== null) {
+                    @chmod($this->temporaryFilename, $this->filePermissions);
                 }
                 if (!rename($this->temporaryFilename, $this->filename)) {
                     throw new WriterException('Could not replace the destination with the completed Xlsx file.');
