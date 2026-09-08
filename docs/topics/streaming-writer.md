@@ -93,7 +93,8 @@ no cached value. If no sheet in the workbook contains a formula, `close()`
 does not force a recalculation on load.
 
 Any `DateTimeInterface` value that has no explicit style gets a default
-date number format automatically.
+date number format automatically. Dates use the output workbook's 1900
+calendar, independently of the global calendar used when reading other files.
 
 `freezePane('A1')` is accepted and writes no frozen pane. A pane frozen
 at the top-left cell freezes zero rows and columns, so the writer skips

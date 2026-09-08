@@ -210,7 +210,7 @@ class StreamingSheet
         if ($forcedType === DataType::TYPE_STRING || $forcedType === DataType::TYPE_STRING2) {
             $this->writeInlineString(is_scalar($value) ? (string) $value : $this->rejectValue($value));
         } elseif ($isDate) {
-            $excelDate = Date::PHPToExcel($value);
+            $excelDate = Date::PHPToExcel($value, $this->writer->getExcelCalendar());
             if ($excelDate === false) {
                 $this->rejectValue($value); // @codeCoverageIgnore
             }

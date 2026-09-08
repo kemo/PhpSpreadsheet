@@ -154,6 +154,12 @@ class StreamingWriter
         return $styleId >= 0 && $styleId < count($this->shell->getCellXfCollection());
     }
 
+    /** @internal Calendar used by the shell workbook and streamed date values. */
+    public function getExcelCalendar(): int
+    {
+        return $this->shell->getExcelCalendar();
+    }
+
     public function getDefaultDateStyleId(): int
     {
         if ($this->defaultDateStyleId === null) {
