@@ -40,11 +40,15 @@ class StreamingWriter
 
     private ?int $defaultDateStyleId = null;
 
+    /** @var array<string, int> Style hash => cell XF index. */
+    private array $styleIds = [];
+
     public function __construct(string $filename)
     {
         $this->filename = $filename;
         $this->shell = new Spreadsheet();
         $this->partWriter = new XlsxWriter($this->shell);
+        $this->styleIds[$this->shell->getCellXfByIndex(0)->getHashCode()] = 0;
         $fileHandle = false;
 
         try {
@@ -133,7 +137,12 @@ class StreamingWriter
         $this->assertNotClosed();
         $style = new Style();
         $style->applyFromArray($styleArray);
+        $hash = $style->getHashCode();
+        if (isset($this->styleIds[$hash])) {
+            return $this->styleIds[$hash];
+        }
         $this->shell->addCellXf($style);
+        $this->styleIds[$hash] = $style->getIndex();
 
         return $style->getIndex();
     }

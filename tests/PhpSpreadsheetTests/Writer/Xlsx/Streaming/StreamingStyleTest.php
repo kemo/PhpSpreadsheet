@@ -8,9 +8,12 @@ use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Shared\File;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming\StreamedCell;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming\StreamingWriter;
 use PHPUnit\Framework\TestCase;
+use SimpleXMLElement;
+use ZipArchive;
 
 class StreamingStyleTest extends TestCase
 {
@@ -53,6 +56,36 @@ class StreamingStyleTest extends TestCase
         self::assertFalse($loaded->cellExists('A2'));
         self::assertFalse($loaded->cellExists('B2'));
         self::assertTrue($loaded->getStyle('C2')->getFont()->getBold());
+        $spreadsheet->disconnectWorksheets();
+    }
+
+    public function testEquivalentStylesReuseStableIds(): void
+    {
+        $writer = new StreamingWriter($this->file);
+        self::assertSame(0, $writer->registerStyle([]));
+        self::assertSame(0, $writer->registerStyle(['font' => ['bold' => false]]));
+        $bold = $writer->registerStyle(['font' => ['bold' => true]]);
+        $sheet = $writer->startSheet('Styles');
+        $sheet->appendRow([42], $bold);
+        for ($index = 0; $index < 100; ++$index) {
+            self::assertSame($bold, $writer->registerStyle(['font' => ['bold' => true]]));
+        }
+        $italic = $writer->registerStyle(['font' => ['italic' => true]]);
+        self::assertNotSame($bold, $italic);
+        $date = $writer->registerStyle(['numberFormat' => ['formatCode' => NumberFormat::FORMAT_DATE_DATETIME_BETTER]]);
+        self::assertSame($date, $writer->getDefaultDateStyleId());
+        $sheet->appendRow([43], $italic);
+        $writer->close();
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($this->file));
+        $data = $zip->getFromName('xl/styles.xml');
+        $zip->close();
+        self::assertIsString($data);
+        $styles = new SimpleXMLElement($data);
+        self::assertSame(4, (int) $styles->cellXfs['count']);
+        $spreadsheet = (new Xlsx())->load($this->file);
+        self::assertTrue($spreadsheet->getActiveSheet()->getStyle('A1')->getFont()->getBold());
+        self::assertTrue($spreadsheet->getActiveSheet()->getStyle('A2')->getFont()->getItalic());
         $spreadsheet->disconnectWorksheets();
     }
 }

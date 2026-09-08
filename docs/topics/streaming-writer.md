@@ -9,7 +9,8 @@ writer would use too much memory.
 
 Use the streaming writer for large, append-only exports, for example a
 report with hundreds of thousands of rows. Peak memory does not depend on
-the number of rows written.
+the number of rows written, provided the number of sheets and distinct
+registered styles stays fixed.
 
 Measurements on this feature: writing 100,000 rows and writing 200,000 rows
 both peak at about 34MB of total memory. Most of that 34MB is a fixed 16MB
@@ -127,6 +128,8 @@ with the number of sheets, not with the number of rows in any one sheet.
   becomes `Data 1`), the same behavior as `Worksheet::setTitle()`.
 - `registerStyle(array $styleArray): int` — registers a style, in the same
   array format used by `Style::applyFromArray()`, and returns its style id.
+  Equivalent styles reuse the same id. Distinct styles remain in memory until
+  the writer is released, so register and reuse a bounded set for large exports.
 - `close(): void` — finishes the last sheet and writes the Xlsx file. The
   writer must have at least one sheet.
 - `abort(): void` — discards unfinished output and closes all sheet streams.
