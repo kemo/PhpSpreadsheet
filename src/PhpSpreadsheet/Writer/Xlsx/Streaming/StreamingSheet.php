@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming;
 
+use Composer\Pcre\Preg;
 use DateTimeInterface;
 use PhpOffice\PhpSpreadsheet\Cell\AddressRange;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -234,6 +235,9 @@ class StreamingSheet
             if (strlen($value) > 1 && $value[0] === '=') {
                 if (!StringHelper::isUTF8($value)) {
                     throw new WriterException('Cell value is not valid UTF-8; writing it would corrupt the sheet XML.');
+                }
+                if (Preg::isMatch('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $value)) {
+                    throw new WriterException('Formula contains a control character that cannot be stored in XML.');
                 }
                 $this->writer->noteFormulaWritten();
                 $xmlWriter->startElement('f');
