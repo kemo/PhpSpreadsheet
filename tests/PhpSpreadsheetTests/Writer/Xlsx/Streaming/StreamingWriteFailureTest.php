@@ -12,6 +12,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx\Streaming\StreamingWriter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use RuntimeException;
 
 class StreamingWriteFailureTest extends TestCase
 {
@@ -24,6 +25,7 @@ class StreamingWriteFailureTest extends TestCase
         ControlledStream::$writeSize = 7;
         ControlledStream::$bytesUntilFailure = null;
         ControlledStream::$returnFalse = false;
+        ControlledStream::$throwOnFailure = false;
         stream_wrapper_register('streamingtest', ControlledStream::class);
     }
 
@@ -36,6 +38,7 @@ class StreamingWriteFailureTest extends TestCase
         ControlledStream::$data = '';
         ControlledStream::$bytesUntilFailure = null;
         ControlledStream::$returnFalse = false;
+        ControlledStream::$throwOnFailure = false;
     }
 
     private function replaceStream(StreamingSheet $sheet): void
@@ -94,6 +97,27 @@ class StreamingWriteFailureTest extends TestCase
             $this->expectExceptionMessage('undefined state');
             $writer->close();
         }
+    }
+
+    public function testExceptionWhileFinishingEmptySheetInvalidatesIt(): void
+    {
+        $writer = new StreamingWriter($this->file);
+        $sheet = $writer->startSheet('Empty');
+        $this->replaceStream($sheet);
+        ControlledStream::$bytesUntilFailure = 3;
+        ControlledStream::$throwOnFailure = true;
+
+        try {
+            $writer->startSheet('Next');
+            self::fail('Expected the empty sheet header write to fail.');
+        } catch (RuntimeException $e) {
+            self::assertSame('Simulated write exception.', $e->getMessage());
+        }
+        ControlledStream::$bytesUntilFailure = null;
+        ControlledStream::$throwOnFailure = false;
+        $this->expectException(WriterException::class);
+        $this->expectExceptionMessage('undefined state');
+        $sheet->appendRow(['must not follow a partial header']);
     }
 
     public static function failureProvider(): array

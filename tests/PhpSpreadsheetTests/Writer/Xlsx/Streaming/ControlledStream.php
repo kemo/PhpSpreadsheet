@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpOffice\PhpSpreadsheetTests\Writer\Xlsx\Streaming;
 
+use RuntimeException;
+
 /** Stream wrapper used to simulate partial writes and exhausted storage. */
 class ControlledStream
 {
@@ -18,6 +20,8 @@ class ControlledStream
 
     public static bool $returnFalse = false;
 
+    public static bool $throwOnFailure = false;
+
     // phpcs:ignore PSR1.Methods.CamelCapsMethodName.NotCamelCaps -- PHP stream wrapper API
     public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
     {
@@ -28,6 +32,10 @@ class ControlledStream
     public function stream_write(string $data): int|false
     {
         if (self::$bytesUntilFailure === 0) {
+            if (self::$throwOnFailure) {
+                throw new RuntimeException('Simulated write exception.');
+            }
+
             return self::$returnFalse ? false : 0;
         }
         $length = min(strlen($data), self::$writeSize, self::$bytesUntilFailure ?? PHP_INT_MAX);

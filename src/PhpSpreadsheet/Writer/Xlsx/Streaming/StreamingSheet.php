@@ -93,14 +93,19 @@ class StreamingSheet
     {
         $length = strlen($data);
         $offset = 0;
-        while ($offset < $length) {
-            $written = fwrite($this->stream, substr($data, $offset));
-            if ($written === false || $written === 0) {
-                $this->broken = true;
 
-                throw new WriterException('Could not write all sheet data to the temporary stream.');
+        try {
+            while ($offset < $length) {
+                $written = fwrite($this->stream, substr($data, $offset));
+                if ($written === false || $written === 0) {
+                    throw new WriterException('Could not write all sheet data to the temporary stream.');
+                }
+                $offset += $written;
             }
-            $offset += $written;
+        } catch (Throwable $e) {
+            $this->broken = true;
+
+            throw $e;
         }
     }
 
@@ -136,7 +141,7 @@ class StreamingSheet
     private function assertUsable(): void
     {
         if ($this->broken) {
-            throw new WriterException('A failed appendRow() left this sheet in an undefined state; discard this writer.');
+            throw new WriterException('A failed write left this sheet in an undefined state; discard this writer.');
         }
         if ($this->finished) {
             throw new WriterException('This sheet has been finished; use the sheet returned by the most recent startSheet().');
