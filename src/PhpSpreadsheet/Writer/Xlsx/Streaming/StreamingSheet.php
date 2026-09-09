@@ -326,7 +326,8 @@ class StreamingSheet
                 throw new WriterException("Column number $columnNumber is invalid; column numbers are 1-based and cannot exceed " . AddressRange::MAX_COLUMN_INT . '.');
             }
             if (!is_finite($width) || $width <= 0 || $width > 255) {
-                throw new WriterException("Column width $width is invalid; width must be positive, finite and no greater than 255.");
+                $label = is_nan($width) ? 'NAN' : (is_infinite($width) ? ($width > 0 ? 'INF' : '-INF') : (string) $width);
+                throw new WriterException("Column width $label is invalid; width must be positive, finite and no greater than 255.");
             }
         }
         // Validate the whole request before replacing any existing widths.
