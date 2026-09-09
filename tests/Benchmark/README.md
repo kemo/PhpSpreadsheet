@@ -41,15 +41,15 @@ Take the median `elapsed_ms` and median `peak_memory_bytes` of each set of
 
 ## Recorded results
 
-Environment: PHP 8.4.17 (CLI), ZipStream 3.1.2, Darwin 23.1.0 arm64,
-2026-09-08. Each engine wrote 200,000 rows x 8 columns in three separate
+Environment: PHP 8.5.10 (CLI), ZipStream 3.1.1, Darwin 23.1.0 arm64,
+2026-09-09. Each engine wrote 200,000 rows x 8 columns in three separate
 `php -d memory_limit=4G` processes. The table reports medians; MiB means
 1,048,576 bytes.
 
 | Engine | Wall time | Peak memory | Output file size |
 | --- | --- | --- | --- |
-| Standard (`Spreadsheet` + `Writer\Xlsx`) | 54.17 s | 1093.09 MiB | 9,173,721 bytes |
-| Streaming (`StreamingWriter`) | 6.38 s | 42.27 MiB | 8,118,639 bytes |
+| Standard (`Spreadsheet` + `Writer\Xlsx`) | 33.83 s | 1093.06 MiB | 9,173,722 bytes |
+| Streaming (`StreamingWriter`) | 5.28 s | 42.27 MiB | 8,118,639 bytes |
 
 Both outputs contain the same values and date formats. These results describe
 this mostly unique-string workload; performance depends on PHP, ZipStream,

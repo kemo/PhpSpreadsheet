@@ -327,6 +327,7 @@ class StreamingSheet
             }
             if (!is_finite($width) || $width <= 0 || $width > 255) {
                 $label = is_nan($width) ? 'NAN' : (is_infinite($width) ? ($width > 0 ? 'INF' : '-INF') : (string) $width);
+
                 throw new WriterException("Column width $label is invalid; width must be positive, finite and no greater than 255.");
             }
         }
